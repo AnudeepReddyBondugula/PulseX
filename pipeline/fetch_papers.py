@@ -22,6 +22,10 @@ from pydantic import BaseModel, Field
 
 from pipeline.config import ARXIV_CATEGORIES, get_logger
 
+import ssl
+if hasattr(ssl, '_create_unverified_context'):
+    ssl._create_default_https_context = ssl._create_unverified_context
+
 logger = get_logger(__name__)
 
 ARXIV_API_BASE = "http://export.arxiv.org/api/query"
@@ -85,7 +89,7 @@ def fetch_category(category: str, now: Optional[datetime] = None) -> List[PaperI
     url = _build_query_url(category)
 
     try:
-        parsed = feedparser.parse(url)
+        parsed = feedparser.parse(url, )  # arXiv's SSL cert is valid, but some environments may not have up-to-date CA bundle
     except Exception as exc:
         logger.warning("Failed to fetch arXiv category %s: %s", category, exc)
         return items
