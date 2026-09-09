@@ -1,0 +1,27 @@
+[project]
+name = "pulsex"
+version = "0.1.0"
+description = "PulseX — daily AI tech news & research digest"
+requires-python = ">=3.11"
+dependencies = [
+    "feedparser>=6.0",
+    "requests>=2.31",
+    "anthropic>=0.40",
+    "flask>=3.0",
+    "python-dotenv>=1.0",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
