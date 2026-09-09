@@ -50,7 +50,8 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    anthropic_api_key: str = Field(..., alias="ANTHROPIC_API_KEY")
+    anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
 
     # Not required until Module A5 — optional here so the pipeline can run
     # standalone before the Flask backend exists.
@@ -104,6 +105,7 @@ FREE_NEWS_EXPLANATIONS_PER_MONTH = 2
 SUBSCRIPTION_PRICE_INR = 60
 
 CLAUDE_MODEL = "claude-haiku-4-5"
+GEMINI_MODEL = "gemini-1.5-turbo"
 
 
 # ---------------------------------------------------------------------------
