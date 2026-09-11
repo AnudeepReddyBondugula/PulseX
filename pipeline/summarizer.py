@@ -11,9 +11,8 @@ from typing import Optional
 from pydantic import BaseModel
 
 from pipeline.config import CLAUDE_MODEL, GEMINI_MODEL, get_logger, get_settings
-from pipeline.llm.providers.anthropic_provider import AnthropicProvider
-from pipeline.llm.providers.gemini import GeminiProvider
-from pipeline.llm.base import LLMProvider
+from llm.base import LLMProvider
+from llm.providers.open_router_provider import OpenRouterProvider
 
 logger = get_logger(__name__)
 
@@ -48,18 +47,19 @@ class Summarizer:
     @staticmethod
     def _build_default_provider() -> LLMProvider:
         settings = get_settings()
-        if settings.gemini_api_key:
-            return GeminiProvider(api_key=settings.gemini_api_key, model=GEMINI_MODEL)
-        return AnthropicProvider(api_key=settings.anthropic_api_key, model=CLAUDE_MODEL)
+        
+        # Use OpenRouterProvider as the default provider
+        # Using only free models for now, but can be changed to any other model supported by OpenRouter
+        return OpenRouterProvider(api_key=settings.openrouter_api_key, model="openrouter/free")
 
     def summarize_news_item(self, item) -> SummaryResult:
         prompt = NEWS_SUMMARY_PROMPT.format(title=item.title, raw_summary=item.raw_summary)
-        summary_text = self._provider.generate(prompt, max_tokens=200)
+        summary_text = self._provider.generate(prompt)
         logger.info("Summarized news item %s", item.id)
         return SummaryResult(item_id=item.id, summary=summary_text, link=item.link)
 
     def summarize_paper_item(self, item) -> SummaryResult:
         prompt = PAPER_SUMMARY_PROMPT.format(title=item.title, raw_summary=item.raw_summary)
-        summary_text = self._provider.generate(prompt, max_tokens=150)
+        summary_text = self._provider.generate(prompt)
         logger.info("Summarized paper item %s", item.id)
         return SummaryResult(item_id=item.id, summary=summary_text, link=item.link)

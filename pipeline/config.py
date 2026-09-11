@@ -50,8 +50,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
-    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
+    openrouter_api_key: str = Field(..., alias="OPENROUTER_API_KEY")
 
     # Not required until Module A5 — optional here so the pipeline can run
     # standalone before the Flask backend exists.
