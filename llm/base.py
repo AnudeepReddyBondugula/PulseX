@@ -15,6 +15,6 @@ class LLMProviderError(Exception):
 
 class LLMProvider(ABC):
     @abstractmethod
-    def generate(self, prompt: str, max_tokens: int = 200) -> str:
+    def generate(self, prompt: str) -> str:
         """Return the model's text response to `prompt`."""
         raise NotImplementedError
