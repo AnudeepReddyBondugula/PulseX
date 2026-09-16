@@ -93,10 +93,17 @@ class ContentProcessingService:
             for result in relevant_results
         }
 
-        ranking_results = self._ranking_processor.rank(
-            [result.item for result in relevant_results],
-            relevance_scores=relevance_scores,
-            now=now,
+        ranking_results = (
+            self._ranking_processor.rank(
+                [
+                    result.item
+                    for result in relevant_results
+                ],
+                relevance_scores=relevance_scores,
+                now=now,
+            )
+            if relevant_results
+            else []
         )
 
         processed_items = [
