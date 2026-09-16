@@ -33,9 +33,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Run tests
-        run: uv run pytest -q
-
       - name: Send the daily brief
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
