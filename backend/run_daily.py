@@ -48,6 +48,11 @@ def run(settings: Settings | None = None) -> int:
         model=config.openrouter_model,
     )
 
+    logger.info(
+        "Using OpenRouter model: %s",
+        config.openrouter_model or "free model fallback list",
+    )
+
     summarized = SummarizationService(
         provider=provider,
     ).summarize(result.processed.items)
