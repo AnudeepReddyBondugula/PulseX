@@ -7,6 +7,8 @@ import pytest
 
 from backend.llm.base import LLMProviderError
 from backend.llm.providers.openrouter import (
+    FREE_MODELS,
+    FREE_SUFFIX,
     OpenRouterProvider,
 )
 
@@ -157,3 +159,115 @@ def test_malformed_response_is_an_error() -> None:
 
         with pytest.raises(LLMProviderError):
             provider.generate("prompt")
+
+
+def test_every_default_model_is_free() -> None:
+    """The account has no credits; a paid slug must not creep in."""
+    assert FREE_MODELS
+
+    for model in FREE_MODELS:
+        assert model.endswith(FREE_SUFFIX)
+
+
+def test_unavailable_model_falls_through_to_the_next() -> None:
+    client = patch_post(
+        build_response(
+            404,
+            {"error": {"message": "No endpoints found"}},
+        ),
+        build_response(
+            200,
+            {"choices": [{"message": {"content": "hi"}}]},
+        ),
+    )
+
+    with patch("httpx.Client", return_value=client):
+        provider = OpenRouterProvider(
+            api_key="key",
+            model=["first/model:free", "second/model:free"],
+        )
+
+        assert provider.generate("prompt") == "hi"
+
+    assert client.post.call_count == 2
+
+    assert (
+        client.post.call_args_list[1].kwargs["json"]["model"]
+        == "second/model:free"
+    )
+
+
+def test_working_model_is_reused() -> None:
+    """115 items a day should not re-walk the list each time."""
+    client = patch_post(
+        build_response(404, {"error": {"message": "gone"}}),
+        build_response(
+            200,
+            {"choices": [{"message": {"content": "one"}}]},
+        ),
+        build_response(
+            200,
+            {"choices": [{"message": {"content": "two"}}]},
+        ),
+    )
+
+    with patch("httpx.Client", return_value=client):
+        provider = OpenRouterProvider(
+            api_key="key",
+            model=["first/model:free", "second/model:free"],
+        )
+
+        provider.generate("prompt")
+        provider.generate("prompt")
+
+    assert client.post.call_count == 3
+
+    assert (
+        client.post.call_args_list[2].kwargs["json"]["model"]
+        == "second/model:free"
+    )
+
+
+def test_error_keeps_the_server_explanation() -> None:
+    """A bare 404 cannot distinguish a retired slug from policy."""
+    client = patch_post(
+        build_response(
+            404,
+            {
+                "error": {
+                    "message": (
+                        "No endpoints found matching your data policy"
+                    ),
+                },
+            },
+        ),
+    )
+
+    with patch("httpx.Client", return_value=client):
+        provider = OpenRouterProvider(
+            api_key="key",
+            model="only/model:free",
+        )
+
+        with pytest.raises(LLMProviderError) as exc_info:
+            provider.generate("prompt")
+
+    assert "only/model:free" in str(exc_info.value)
+
+
+def test_exhausting_every_model_raises() -> None:
+    client = patch_post(
+        build_response(404, {"error": {"message": "gone"}}),
+        build_response(404, {"error": {"message": "gone"}}),
+    )
+
+    with patch("httpx.Client", return_value=client):
+        provider = OpenRouterProvider(
+            api_key="key",
+            model=["a/b:free", "c/d:free"],
+        )
+
+        with pytest.raises(LLMProviderError):
+            provider.generate("prompt")
+
+    assert client.post.call_count == 2

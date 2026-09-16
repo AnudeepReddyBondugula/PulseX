@@ -2,10 +2,10 @@
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from backend.llm.providers.openrouter import DEFAULT_MODEL
+from backend.llm.providers.openrouter import FREE_SUFFIX
 
 
 class Settings(BaseSettings):
@@ -23,7 +23,10 @@ class Settings(BaseSettings):
     )
 
     openrouter_api_key: str = Field(min_length=1)
-    openrouter_model: str = DEFAULT_MODEL
+
+    # Unset means try the built-in free models in order. A value
+    # here pins one model and disables that fallback.
+    openrouter_model: str | None = None
 
     resend_api_key: str = Field(min_length=1)
 
@@ -33,6 +36,29 @@ class Settings(BaseSettings):
     max_brief_items: int = Field(default=15, ge=1)
 
     seen_store_path: str = "data/seen_items.json"
+
+
+    @field_validator("openrouter_model")
+    @classmethod
+    def _reject_paid_models(
+        cls,
+        value: str | None,
+    ) -> str | None:
+        """Keep the account off models it cannot pay for.
+
+        PulseX runs on an account with no credits, so a paid
+        slug should fail here rather than at billing time.
+        """
+        if value is None:
+            return None
+
+        if not value.endswith(FREE_SUFFIX):
+            raise ValueError(
+                f"openrouter_model must be a free model ending "
+                f"in '{FREE_SUFFIX}', got: {value}"
+            )
+
+        return value
 
 
 @lru_cache
