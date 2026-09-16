@@ -1,0 +1,58 @@
+name: Daily Brief
+
+on:
+  schedule:
+    # 00:00 UTC is 05:30 IST. GitHub runs scheduled jobs on a
+    # best-effort basis and often starts them late under load.
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+# The run commits the seen store, so two overlapping runs would
+# race each other for the same file.
+concurrency:
+  group: daily-brief
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Send the daily brief
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: uv run python -m backend.run_daily
+
+      - name: Persist the seen store
+        run: |
+          if [[ -z "$(git status --porcelain data/seen_items.json)" ]]; then
+            echo "Seen store unchanged, nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/seen_items.json
+          git commit -m "chore: record delivered items for $(date -u +%Y-%m-%d)"
+          git push

@@ -63,9 +63,15 @@ class Deduplicator:
 
     @staticmethod
     def _content_hash(item: ContentItem) -> str:
-        """Return a deterministic content identity hash."""
-        if item.content_hash:
-            return item.content_hash
+        """Return a deterministic content identity hash.
+
+        Only articles carry a precomputed hash from their
+        collector; papers are hashed from their fields here.
+        """
+        content_hash = getattr(item, "content_hash", None)
+
+        if content_hash:
+            return content_hash
 
         content = "|".join(
             (
