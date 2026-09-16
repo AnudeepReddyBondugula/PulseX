@@ -16,17 +16,18 @@ OPENROUTER_API_URL = (
     "https://openrouter.ai/api/v1/chat/completions"
 )
 
-# Free slugs only: PulseX runs on an account with no credits, so a
-# paid model would fail at billing rather than quietly cost money.
-# OpenRouter retires free models and answers 404 for a slug it no
-# longer serves, so more than one is listed and they are tried in
-# order.
+# Free capacity only: PulseX runs on an account with no credits.
+# OpenRouter rotates which models it serves for free and answers 404
+# for the rest, which is what broke the first runs, so the auto-router
+# comes first: it resolves to whatever is free at the time. The named
+# slugs are a backstop for when it is unavailable.
+AUTO_FREE_MODEL = "openrouter/free"
+
 FREE_MODELS: tuple[str, ...] = (
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "deepseek/deepseek-chat-v3-0324:free",
-    "qwen/qwen-2.5-72b-instruct:free",
-    "google/gemma-2-9b-it:free",
-    "mistralai/mistral-7b-instruct:free",
+    AUTO_FREE_MODEL,
+    "openai/gpt-oss-20b:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
 )
 
 DEFAULT_MODEL = FREE_MODELS[0]
@@ -81,6 +82,7 @@ class OpenRouterProvider(LLMProvider):
         self._timeout = timeout
         self._max_attempts = max_attempts
         self._active_model: str | None = None
+        self._exhausted: Exception | None = None
 
     def generate(self, prompt: str) -> str:
         """Return the model's response to a prompt.
@@ -89,6 +91,15 @@ class OpenRouterProvider(LLMProvider):
         cannot serve the request, and remembers the model that
         worked so later calls do not re-walk the list.
         """
+        if self._exhausted is not None:
+            # Every model was already refused this run. Retrying
+            # per item would spend the daily free-tier quota on
+            # calls that cannot succeed.
+            raise LLMProviderError(
+                "No configured OpenRouter model could serve the "
+                f"request (tried: {', '.join(self._models)})"
+            ) from self._exhausted
+
         last_error: Exception | None = None
 
         for model in self._candidates():
@@ -112,6 +123,8 @@ class OpenRouterProvider(LLMProvider):
             self._active_model = model
 
             return response
+
+        self._exhausted = last_error
 
         raise LLMProviderError(
             "No configured OpenRouter model could serve the "

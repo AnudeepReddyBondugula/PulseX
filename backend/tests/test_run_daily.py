@@ -189,3 +189,30 @@ def test_send_uses_the_configured_recipient(
         harness.sender.send.call_args.kwargs["recipient"]
         == "reader@example.com"
     )
+
+
+def test_only_brief_sized_slice_is_summarized(
+    settings: Settings,
+    harness: Harness,
+) -> None:
+    """An LLM call per collected item would be mostly wasted."""
+    considered = [Mock() for _ in range(50)]
+
+    harness.pipeline.run.return_value = DigestResult(
+        processed=ProcessedContent(
+            items=considered,
+            duplicates=[],
+            irrelevant=[],
+        ),
+        failures=[],
+        considered=considered,
+    )
+
+    harness.summarizer.summarize.return_value = [Mock()]
+
+    run(settings)
+
+    summarized = harness.summarizer.summarize.call_args.args[0]
+
+    assert len(summarized) == settings.max_brief_items
+    assert summarized == considered[: settings.max_brief_items]
