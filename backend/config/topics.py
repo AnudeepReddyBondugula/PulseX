@@ -1,0 +1,105 @@
+"""Topic extraction configuration."""
+
+from backend.models.topic import Topic
+
+
+TOPIC_KEYWORDS: dict[Topic, tuple[str, ...]] = {
+    Topic.LLM: (
+        "llm",
+        "large language model",
+        "large language models",
+        "language model",
+        "language models",
+    ),
+    Topic.GENERATIVE_AI: (
+        "generative ai",
+        "generative artificial intelligence",
+        "genai",
+        "text generation",
+        "image generation",
+        "video generation",
+    ),
+    Topic.AI_AGENTS: (
+        "ai agent",
+        "ai agents",
+        "agentic ai",
+        "agentic",
+        "autonomous agent",
+        "autonomous agents",
+    ),
+    Topic.MACHINE_LEARNING: (
+        "machine learning",
+        "ml model",
+        "ml models",
+        "supervised learning",
+        "unsupervised learning",
+    ),
+    Topic.DEEP_LEARNING: (
+        "deep learning",
+        "neural network",
+        "neural networks",
+        "deep neural network",
+        "deep neural networks",
+    ),
+    Topic.COMPUTER_VISION: (
+        "computer vision",
+        "image recognition",
+        "object detection",
+        "image segmentation",
+        "visual recognition",
+    ),
+    Topic.NLP: (
+        "natural language processing",
+        "nlp",
+        "text classification",
+        "named entity recognition",
+        "language understanding",
+    ),
+    Topic.MULTIMODAL_AI: (
+        "multimodal",
+        "multimodal ai",
+        "vision-language",
+        "vision language model",
+        "vision-language model",
+    ),
+    Topic.ROBOTICS: (
+        "robotics",
+        "robot",
+        "robots",
+        "robotic",
+    ),
+    Topic.AI_SAFETY: (
+        "ai safety",
+        "ai alignment",
+        "alignment",
+        "model safety",
+        "responsible ai",
+        "responsible artificial intelligence",
+    ),
+    Topic.AI_INFRASTRUCTURE: (
+        "ai infrastructure",
+        "ml infrastructure",
+        "inference infrastructure",
+        "model serving",
+        "gpu infrastructure",
+        "ai compute",
+    ),
+    Topic.AI_RESEARCH: (
+        "ai research",
+        "artificial intelligence research",
+        "machine learning research",
+        "research paper",
+        "researchers",
+    ),
+    Topic.AI_HARDWARE: (
+        "ai hardware",
+        "ai chip",
+        "ai chips",
+        "accelerator",
+        "accelerators",
+        "gpu",
+        "gpus",
+        "tpu",
+        "tpu",
+    ),
+}
