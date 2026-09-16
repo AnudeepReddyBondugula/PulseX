@@ -7,6 +7,7 @@ import pytest
 
 from backend.llm.base import LLMProviderError
 from backend.llm.providers.openrouter import (
+    AUTO_FREE_MODEL,
     FREE_MODELS,
     FREE_SUFFIX,
     OpenRouterProvider,
@@ -166,7 +167,15 @@ def test_every_default_model_is_free() -> None:
     assert FREE_MODELS
 
     for model in FREE_MODELS:
-        assert model.endswith(FREE_SUFFIX)
+        assert (
+            model == AUTO_FREE_MODEL
+            or model.endswith(FREE_SUFFIX)
+        )
+
+
+def test_auto_router_is_tried_first() -> None:
+    """It resolves to whatever is free as models rotate."""
+    assert FREE_MODELS[0] == AUTO_FREE_MODEL
 
 
 def test_unavailable_model_falls_through_to_the_next() -> None:
@@ -269,5 +278,27 @@ def test_exhausting_every_model_raises() -> None:
 
         with pytest.raises(LLMProviderError):
             provider.generate("prompt")
+
+    assert client.post.call_count == 2
+
+
+def test_exhaustion_stops_further_requests() -> None:
+    """Retrying per item would spend the daily free quota."""
+    client = patch_post(
+        build_response(404, {"error": {"message": "gone"}}),
+        build_response(404, {"error": {"message": "gone"}}),
+    )
+
+    with patch("httpx.Client", return_value=client):
+        provider = OpenRouterProvider(
+            api_key="key",
+            model=["a/b:free", "c/d:free"],
+        )
+
+        with pytest.raises(LLMProviderError):
+            provider.generate("first")
+
+        with pytest.raises(LLMProviderError):
+            provider.generate("second")
 
     assert client.post.call_count == 2

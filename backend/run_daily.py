@@ -53,9 +53,15 @@ def run(settings: Settings | None = None) -> int:
         config.openrouter_model or "free model fallback list",
     )
 
+    # Summarize only what the brief will carry. Items arrive
+    # ranked, and generate() keeps this same number, so
+    # summarizing the whole day spent a call per item on
+    # content the email then discarded.
+    selected = result.processed.items[: config.max_brief_items]
+
     summarized = SummarizationService(
         provider=provider,
-    ).summarize(result.processed.items)
+    ).summarize(selected)
 
     if not summarized:
         # Nothing cleared the filters. Mark what we looked at so

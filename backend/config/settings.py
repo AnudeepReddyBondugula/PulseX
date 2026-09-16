@@ -5,7 +5,10 @@ from functools import lru_cache
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from backend.llm.providers.openrouter import FREE_SUFFIX
+from backend.llm.providers.openrouter import (
+    AUTO_FREE_MODEL,
+    FREE_SUFFIX,
+)
 
 
 class Settings(BaseSettings):
@@ -52,10 +55,13 @@ class Settings(BaseSettings):
         if value is None:
             return None
 
+        if value == AUTO_FREE_MODEL:
+            return value
+
         if not value.endswith(FREE_SUFFIX):
             raise ValueError(
-                f"openrouter_model must be a free model ending "
-                f"in '{FREE_SUFFIX}', got: {value}"
+                f"openrouter_model must be '{AUTO_FREE_MODEL}' or "
+                f"a free model ending in '{FREE_SUFFIX}', got: {value}"
             )
 
         return value
