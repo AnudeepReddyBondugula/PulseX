@@ -104,3 +104,70 @@ def test_create_digest_pipeline_wires_defaults() -> None:
     pipeline = create_digest_pipeline()
 
     assert isinstance(pipeline, DigestPipeline)
+
+
+def test_run_filters_items_already_seen() -> None:
+    collection = Mock()
+    processing = Mock()
+    seen_store = Mock()
+
+    old = create_article("old")
+    fresh = create_article("fresh")
+
+    collection.collect.return_value = CollectionResult(
+        articles=[old, fresh],
+    )
+
+    seen_store.filter_new.return_value = [fresh]
+
+    processing.process.return_value = ProcessedContent(
+        items=[],
+        duplicates=[],
+        irrelevant=[],
+    )
+
+    pipeline = DigestPipeline(
+        collection_service=collection,
+        processing_service=processing,
+        seen_store=seen_store,
+    )
+
+    result = pipeline.run()
+
+    seen_store.filter_new.assert_called_once_with(
+        [old, fresh],
+    )
+
+    processing.process.assert_called_once_with(
+        [fresh],
+        now=None,
+    )
+
+    assert result.considered == [fresh]
+
+
+def test_run_never_marks_items_seen() -> None:
+    """Marking belongs after delivery, not inside the run."""
+    collection = Mock()
+    processing = Mock()
+    seen_store = Mock()
+
+    collection.collect.return_value = CollectionResult(
+        articles=[create_article("1")],
+    )
+
+    seen_store.filter_new.return_value = []
+
+    processing.process.return_value = ProcessedContent(
+        items=[],
+        duplicates=[],
+        irrelevant=[],
+    )
+
+    DigestPipeline(
+        collection_service=collection,
+        processing_service=processing,
+        seen_store=seen_store,
+    ).run()
+
+    seen_store.mark_seen.assert_not_called()

@@ -19,9 +19,14 @@ from backend.services.collection import (
     CollectionFailure,
     CollectionService,
 )
+from backend.services.collection import ContentItem
 from backend.services.content_processing import (
     ContentProcessingService,
     ProcessedContent,
+)
+from backend.storage.seen_store import (
+    JSONSeenStore,
+    SeenStore,
 )
 
 
@@ -34,6 +39,7 @@ class DigestResult:
 
     processed: ProcessedContent
     failures: list[CollectionFailure]
+    considered: list[ContentItem]
 
 
 class DigestPipeline:
@@ -43,25 +49,38 @@ class DigestPipeline:
         self,
         collection_service: CollectionService,
         processing_service: ContentProcessingService,
+        seen_store: SeenStore | None = None,
     ) -> None:
         self._collection_service = collection_service
         self._processing_service = processing_service
+        self._seen_store = seen_store
 
     def run(
         self,
         *,
         now: datetime | None = None,
     ) -> DigestResult:
-        """Collect from every source, then process the results."""
+        """Collect from every source, then process the results.
+
+        The run never marks anything as seen. Delivery happens
+        after this returns, and an item marked seen is never
+        offered again, so marking here would drop a day of
+        content whenever sending failed.
+        """
         collection = self._collection_service.collect()
+
+        items = collection.items
+
+        if self._seen_store is not None:
+            items = self._seen_store.filter_new(items)
 
         logger.info(
             "Processing collected content: items=%d",
-            len(collection.items),
+            len(items),
         )
 
         processed = self._processing_service.process(
-            collection.items,
+            items,
             now=now,
         )
 
@@ -75,10 +94,13 @@ class DigestPipeline:
         return DigestResult(
             processed=processed,
             failures=collection.failures,
+            considered=items,
         )
 
 
-def create_digest_pipeline() -> DigestPipeline:
+def create_digest_pipeline(
+    seen_store: SeenStore | None = None,
+) -> DigestPipeline:
     """Build a pipeline wired with the default components."""
     collection_service = CollectionService(
         rss_service=RSSIngestionService(
@@ -102,4 +124,5 @@ def create_digest_pipeline() -> DigestPipeline:
     return DigestPipeline(
         collection_service=collection_service,
         processing_service=processing_service,
+        seen_store=seen_store or JSONSeenStore(),
     )
