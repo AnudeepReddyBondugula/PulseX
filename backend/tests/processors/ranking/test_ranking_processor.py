@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from backend.config.ranking import RankingConfig
 from backend.models.article import Article
+from backend.models.research_paper import ResearchPaper
 from backend.processors.ranking.processor import RankingProcessor
 
 
@@ -289,3 +290,61 @@ def test_recency_half_life_is_respected() -> None:
     )
 
     assert result.score == 0.5
+
+def test_papers_are_scored_as_arxiv() -> None:
+    """Papers have no source field; arXiv's quality applies."""
+    paper = ResearchPaper(
+        id="2601.1",
+        arxiv_id="2601.1",
+        title="Scaling laws",
+        authors=["Alice Smith"],
+        abstract="An abstract.",
+        url="https://arxiv.org/abs/2601.1",
+        published_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+        categories=["cs.AI"],
+    )
+
+    result = RankingProcessor().score(
+        paper,
+        relevance_score=0.5,
+        now=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+
+    assert 0.0 <= result.score <= 1.0
+
+
+def test_papers_and_articles_rank_together() -> None:
+    """A mixed batch is what a real daily run produces."""
+    now = datetime(2026, 1, 2, tzinfo=UTC)
+
+    paper = ResearchPaper(
+        id="2601.1",
+        arxiv_id="2601.1",
+        title="Scaling laws",
+        authors=["Alice Smith"],
+        abstract="An abstract.",
+        url="https://arxiv.org/abs/2601.1",
+        published_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+        categories=["cs.AI"],
+    )
+
+    article = Article(
+        id="a1",
+        title="A new model release",
+        source="OpenAI",
+        source_url="https://openai.com",
+        url="https://openai.com/a1",
+        published_at="2026-01-01T00:00:00Z",
+        fetched_at="2026-01-02T00:00:00Z",
+        content_hash="hash-a1",
+    )
+
+    results = RankingProcessor().rank(
+        [paper, article],
+        relevance_scores={"2601.1": 0.5, "a1": 0.5},
+        now=now,
+    )
+
+    assert len(results) == 2

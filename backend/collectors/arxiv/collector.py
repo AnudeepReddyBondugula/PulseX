@@ -25,8 +25,10 @@ class ArxivCollector:
         config: ArxivQueryConfig,
     ) -> list[dict[str, Any]]:
         """Collect raw arXiv entries for a configured query."""
+        search_query = config.build_search_query()
+
         params = {
-            "search_query": config.query,
+            "search_query": search_query,
             "start": 0,
             "max_results": config.max_results,
             "sortBy": config.sort_by.value,
@@ -35,7 +37,7 @@ class ArxivCollector:
 
         logger.info(
             "Collecting arXiv papers: query=%s max_results=%d",
-            config.query,
+            search_query,
             config.max_results,
         )
 

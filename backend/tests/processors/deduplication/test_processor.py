@@ -1,6 +1,7 @@
 """Tests for deterministic deduplication."""
 
 from backend.models.article import Article
+from backend.models.research_paper import ResearchPaper
 from backend.processors.deduplication.processor import (
     Deduplicator,
 )
@@ -204,3 +205,56 @@ def test_canonical_url_removes_fragment() -> None:
     assert canonical == (
         "https://example.com/article?source=test"
     )
+
+def create_paper(
+    paper_id: str,
+    title: str = "Scaling laws",
+) -> ResearchPaper:
+    """Create a test research paper."""
+    return ResearchPaper(
+        id=paper_id,
+        arxiv_id=paper_id,
+        title=title,
+        authors=["Alice Smith"],
+        abstract="An abstract.",
+        url=f"https://arxiv.org/abs/{paper_id}",
+        published_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+        categories=["cs.AI"],
+    )
+
+
+def test_papers_without_a_content_hash_are_handled() -> None:
+    """Only articles carry a precomputed content hash."""
+    papers = [
+        create_paper("2601.1", "First paper"),
+        create_paper("2601.2", "Second paper"),
+    ]
+
+    result = Deduplicator().deduplicate(papers)
+
+    assert result.unique == papers
+    assert result.duplicates == []
+
+
+def test_duplicate_papers_are_detected() -> None:
+    first = create_paper("2601.1")
+    repeat = create_paper("2601.1")
+
+    result = Deduplicator().deduplicate([first, repeat])
+
+    assert result.unique == [first]
+    assert result.duplicates == [repeat]
+
+
+def test_articles_and_papers_deduplicate_together() -> None:
+    article = create_article(
+        article_id="a1",
+        title="A news item",
+    )
+
+    paper = create_paper("2601.1", "A paper")
+
+    result = Deduplicator().deduplicate([article, paper])
+
+    assert result.unique == [article, paper]

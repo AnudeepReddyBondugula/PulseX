@@ -17,6 +17,20 @@ from backend.models.research_paper import ResearchPaper
 
 ContentItem = Article | ResearchPaper
 
+ARXIV_SOURCE_NAME = "arXiv"
+
+
+def _item_source(item: ContentItem) -> str:
+    """Return the source name to score an item against.
+
+    Only articles carry a source name; every paper comes from
+    arXiv, which the quality table already scores.
+    """
+    if isinstance(item, ResearchPaper):
+        return ARXIV_SOURCE_NAME
+
+    return item.source
+
 
 @dataclass(frozen=True)
 class RankingResult:
@@ -53,7 +67,7 @@ class RankingProcessor:
         )
 
         source_score = self._calculate_source_quality(
-            item.source,
+            _item_source(item),
         )
 
         significance_score = self._calculate_significance_score(
