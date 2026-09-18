@@ -1,10 +1,29 @@
 """RSS entry normalization."""
 
+import re
 from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Any
 
 from backend.models import Article, Source
+
+
+IMAGE_MEDIA_PREFIX = "image/"
+
+IMAGE_EXTENSIONS = (
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".gif",
+)
+
+# Matches the first src in an <img> tag, for feeds that ship images
+# only inside the HTML body.
+INLINE_IMAGE_PATTERN = re.compile(
+    r"""<img[^>]+src=["\']([^"\']+)["\']""",
+    re.IGNORECASE,
+)
 
 
 class RSSNormalizationError(Exception):
@@ -49,6 +68,7 @@ class RSSNormalizer:
             source_url=source.feed_url,
             url=url,
             author=self._get_optional_string(entry, "author"),
+            image_url=self._extract_image_url(entry),
             published_at=published_at,
             fetched_at=fetched_at,
             description=description,
@@ -140,6 +160,166 @@ class RSSNormalizer:
             "RSS entry has no valid publication date"
         )
 
+    @classmethod
+    def _extract_image_url(
+        cls,
+        entry: dict[str, Any],
+    ) -> str | None:
+        """Find a hero image for the entry, if it has one.
+
+        Feeds advertise images in several places and agree on
+        none of them, so each known location is tried in turn,
+        most explicit first. Returning None is normal: plenty of
+        feeds carry no image at all.
+        """
+        for extract in (
+            cls._image_from_media_thumbnail,
+            cls._image_from_media_content,
+            cls._image_from_enclosures,
+            cls._image_from_links,
+            cls._image_from_html,
+        ):
+            url = extract(entry)
+
+            if url is not None:
+                return url
+
+        return None
+
+    @staticmethod
+    def _image_from_media_thumbnail(
+        entry: dict[str, Any],
+    ) -> str | None:
+        """Read a media:thumbnail element."""
+        thumbnails = entry.get("media_thumbnail")
+
+        if not isinstance(thumbnails, list):
+            return None
+
+        for thumbnail in thumbnails:
+            if isinstance(thumbnail, dict):
+                url = thumbnail.get("url")
+
+                if _is_http_url(url):
+                    return url
+
+        return None
+
+    @staticmethod
+    def _image_from_media_content(
+        entry: dict[str, Any],
+    ) -> str | None:
+        """Read a media:content element declaring an image."""
+        contents = entry.get("media_content")
+
+        if not isinstance(contents, list):
+            return None
+
+        for content in contents:
+            if not isinstance(content, dict):
+                continue
+
+            url = content.get("url")
+
+            if not _is_http_url(url):
+                continue
+
+            medium = content.get("medium")
+            content_type = content.get("type", "")
+
+            if (
+                medium == "image"
+                or str(content_type).startswith(
+                    IMAGE_MEDIA_PREFIX,
+                )
+                or _looks_like_image(url)
+            ):
+                return url
+
+        return None
+
+    @staticmethod
+    def _image_from_enclosures(
+        entry: dict[str, Any],
+    ) -> str | None:
+        """Read an enclosure whose type is an image."""
+        enclosures = entry.get("enclosures")
+
+        if not isinstance(enclosures, list):
+            return None
+
+        for enclosure in enclosures:
+            if not isinstance(enclosure, dict):
+                continue
+
+            url = enclosure.get("href") or enclosure.get("url")
+
+            if not _is_http_url(url):
+                continue
+
+            content_type = str(enclosure.get("type", ""))
+
+            if content_type.startswith(
+                IMAGE_MEDIA_PREFIX
+            ) or _looks_like_image(url):
+                return url
+
+        return None
+
+    @staticmethod
+    def _image_from_links(
+        entry: dict[str, Any],
+    ) -> str | None:
+        """Read a link element pointing at an image."""
+        links = entry.get("links")
+
+        if not isinstance(links, list):
+            return None
+
+        for link in links:
+            if not isinstance(link, dict):
+                continue
+
+            url = link.get("href")
+
+            if not _is_http_url(url):
+                continue
+
+            content_type = str(link.get("type", ""))
+
+            if content_type.startswith(IMAGE_MEDIA_PREFIX):
+                return url
+
+        return None
+
+    @classmethod
+    def _image_from_html(
+        cls,
+        entry: dict[str, Any],
+    ) -> str | None:
+        """Fall back to the first image in the entry body."""
+        for field in ("content", "summary"):
+            value = entry.get(field)
+
+            if isinstance(value, list) and value:
+                first = value[0]
+
+                value = (
+                    first.get("value")
+                    if isinstance(first, dict)
+                    else None
+                )
+
+            if not isinstance(value, str):
+                continue
+
+            match = INLINE_IMAGE_PATTERN.search(value)
+
+            if match and _is_http_url(match.group(1)):
+                return match.group(1)
+
+        return None
+
     @staticmethod
     def _create_article_id(url: str) -> str:
         return sha256(url.encode("utf-8")).hexdigest()
@@ -160,3 +340,17 @@ class RSSNormalizer:
         )
 
         return sha256(value.encode("utf-8")).hexdigest()
+
+
+def _is_http_url(value: Any) -> bool:
+    """Whether a value is a usable absolute HTTP(S) URL."""
+    return isinstance(value, str) and value.startswith(
+        ("http://", "https://"),
+    )
+
+
+def _looks_like_image(url: str) -> bool:
+    """Whether a URL's path ends in a known image extension."""
+    path = url.split("?")[0].split("#")[0].lower()
+
+    return path.endswith(IMAGE_EXTENSIONS)

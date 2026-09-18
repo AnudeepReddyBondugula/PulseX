@@ -40,6 +40,7 @@ def test_declared_dependencies_are_imported() -> None:
 
     assert declared == {
         "feedparser",
+        "firebase-admin",
         "httpx",
         "pydantic",
         "pydantic-settings",

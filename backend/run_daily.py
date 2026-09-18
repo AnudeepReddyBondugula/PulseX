@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from backend.config.settings import Settings, get_settings
+from backend.models import DailyBrief
 from backend.delivery.renderer import BriefRenderer
 from backend.delivery.sender import (
     EmailDeliveryError,
@@ -13,7 +14,18 @@ from backend.delivery.sender import (
 from backend.llm.providers.openrouter import (
     OpenRouterProvider,
 )
+from backend.notifications.fcm import (
+    FCMNotifier,
+    NotificationError,
+    create_messaging,
+)
+from backend.publishing.firestore import (
+    BriefPublishError,
+    FirestoreBriefPublisher,
+    create_firestore_client,
+)
 from backend.services.brief import BriefGenerationService
+from backend.services.content_processing import ProcessedItem
 from backend.services.digest import create_digest_pipeline
 from backend.services.summarization import (
     SummarizationService,
@@ -77,6 +89,21 @@ def run(settings: Settings | None = None) -> int:
         max_items=config.max_brief_items,
     ).generate(summarized)
 
+    # The app reads Firestore, so publish before announcing.
+    # Nothing is marked seen until every required channel has
+    # succeeded, so a failure here means the next run offers the
+    # same content again rather than losing it. Re-publishing is
+    # safe: the document id is the date, so a retry overwrites.
+    if config.publishes_to_app:
+        try:
+            _publish_to_app(config, brief, summarized)
+        except BriefPublishError:
+            logger.exception(
+                "Could not publish the brief for the app",
+            )
+
+            return 1
+
     renderer = BriefRenderer()
 
     sender = ResendEmailSender(
@@ -91,8 +118,6 @@ def run(settings: Settings | None = None) -> int:
             html=renderer.render(brief, summarized),
         )
     except EmailDeliveryError:
-        # Nothing is marked seen, so today's content is offered
-        # again on the next run rather than being lost.
         logger.exception("Could not send the daily brief")
 
         return 1
@@ -105,6 +130,34 @@ def run(settings: Settings | None = None) -> int:
     )
 
     return 0
+
+
+def _publish_to_app(
+    config: Settings,
+    brief: DailyBrief,
+    summarized: list[ProcessedItem],
+) -> None:
+    """Publish the brief, then announce it to the app.
+
+    A failed notification is logged rather than raised: the brief
+    is already readable in the app, so the reader has lost the
+    morning ping but not the content.
+    """
+    client = create_firestore_client(
+        config.firebase_service_account_json or "",
+    )
+
+    FirestoreBriefPublisher(client).publish(brief, summarized)
+
+    try:
+        FCMNotifier(
+            messaging=create_messaging(),
+            topic=config.fcm_topic,
+        ).notify(brief, item_count=len(summarized))
+    except NotificationError:
+        logger.exception(
+            "Brief published but the notification failed",
+        )
 
 
 def main() -> int:

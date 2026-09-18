@@ -12,9 +12,9 @@ curious rather than a specialist.
 ## How it works
 
 ```
-RSS feeds ─┐
-           ├─→ collection ─→ seen store ─→ processing ─→ summarization ─→ brief ─→ email
-arXiv API ─┘                  (filter)      (rank)        (LLM)          (LLM)    (Resend)
+RSS feeds ─┐                                                        ┌→ email
+           ├─→ collect ─→ filter ─→ rank ─→ summarize ─→ brief ──────┼→ Firestore → app
+arXiv API ─┘               (seen)          (LLM)                    └→ FCM → notification
 ```
 
 Filtering and ranking are deterministic: keyword matching, exponential recency
@@ -49,6 +49,7 @@ Full documentation lives in **[`backend/docs/`](backend/docs/README.md)**.
 | [Architecture](backend/docs/architecture.md) | Layers, module map, design decisions |
 | [The pipeline](backend/docs/pipeline.md) | One run, stage by stage |
 | [Configuration](backend/docs/configuration.md) | Every secret and tuning knob |
+| [Mobile setup](backend/docs/mobile-setup.md) | Firebase, running the app, Play Store release |
 | [Contributing](backend/docs/contributing.md) | Conventions and recipes |
 | [Operations](backend/docs/operations.md) | Workflows, rate limits, what has broken |
 | [Mathematical theory](backend/docs/PulseX_Content_Processing_Mathematical_Theory.md) | The scoring formulas in full |
@@ -63,5 +64,8 @@ and a Flutter mobile client in a later release.
 
 ## Stack
 
-Python 3.11+, pydantic, httpx, feedparser. OpenRouter for summarization, Resend
-for delivery, GitHub Actions for scheduling. Four runtime dependencies in total.
+**Backend:** Python 3.11+, pydantic, httpx, feedparser, firebase-admin.
+OpenRouter for summarization, Resend for email, Firestore and FCM for the app,
+GitHub Actions for scheduling.
+
+**App:** Flutter, with Firebase core, Firestore, Auth and Messaging.
