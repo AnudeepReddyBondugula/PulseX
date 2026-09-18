@@ -9,6 +9,7 @@ from backend.llm.providers.openrouter import (
     AUTO_FREE_MODEL,
     FREE_SUFFIX,
 )
+from backend.notifications.fcm import DEFAULT_TOPIC
 
 
 class Settings(BaseSettings):
@@ -38,6 +39,14 @@ class Settings(BaseSettings):
 
     max_brief_items: int = Field(default=15, ge=1)
 
+    # Unset disables Firestore publishing and the push
+    # notification, leaving email as the only channel. The value
+    # is the service account JSON itself, not a path, because the
+    # only place this runs is a runner with no persistent disk.
+    firebase_service_account_json: str | None = None
+
+    fcm_topic: str = DEFAULT_TOPIC
+
     seen_store_path: str = "data/seen_items.json"
 
 
@@ -65,6 +74,12 @@ class Settings(BaseSettings):
             )
 
         return value
+
+
+    @property
+    def publishes_to_app(self) -> bool:
+        """Whether the app channel is configured."""
+        return bool(self.firebase_service_account_json)
 
 
 @lru_cache
