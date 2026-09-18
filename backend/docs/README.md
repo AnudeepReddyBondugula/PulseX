@@ -19,6 +19,10 @@ Read alongside `backend/run_daily.py`.
 **[Configuration](configuration.md)** — every secret and every tuning knob, what
 it does, and what happens if you change it.
 
+**[Mobile setup](mobile-setup.md)** — the Flutter app: Firebase project, the
+steps only the account owner can do, running it, and releasing to the Play
+Store.
+
 **[Mathematical theory](PulseX_Content_Processing_Mathematical_Theory.md)** —
 the formal treatment of deduplication, relevance, topics and importance, with
 notation, worked examples and the model's stated limitations.
