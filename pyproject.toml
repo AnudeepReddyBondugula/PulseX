@@ -22,3 +22,12 @@ pythonpath = ["."]
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+# backend is the only package. Without this, setuptools falls back to
+# flat-layout auto-discovery, which treats every top-level directory as a
+# candidate package and refuses to build when it finds more than one. The
+# daily workflow commits data/seen_items.json, so the first successful run
+# created a second top-level directory and broke the build for every run
+# after it.
+[tool.setuptools.packages.find]
+include = ["backend*"]
