@@ -4,7 +4,7 @@ Daily AI-curated digest of tech news and arXiv research from trusted sources.
 
 PulseX collects AI news from 11 RSS feeds and research papers from arXiv, filters
 and ranks them with explainable heuristics, summarizes the best of them with an
-LLM, and emails one brief every morning at 05:30 IST.
+LLM, and emails one brief every morning at 05:37 IST.
 
 Research papers are explained in plain language, on the assumption the reader is
 curious rather than a specialist.
