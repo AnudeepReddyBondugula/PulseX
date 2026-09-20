@@ -19,7 +19,7 @@ to write to the repository.
 ```yaml
 on:
   schedule:
-    - cron: "0 0 * * *"   # 00:00 UTC = 05:30 IST
+    - cron: "7 0 * * *"   # 00:07 UTC = 05:37 IST
   workflow_dispatch:
 ```
 
@@ -161,5 +161,5 @@ than aborting. Design for the parts you cannot test.
 | Resend rejects the send | `EMAIL_FROM` domain not verified |
 | Email arrives with no summaries | LLM calls failing; check for `Model unavailable` |
 | "No new content today" | Everything already in the seen store |
-| Nothing at 05:30 IST | Scheduled runs are delayed; also check the workflow is on `master` |
+| Nothing at 05:37 IST | Scheduled runs are delayed; also check the workflow is on `master` |
 | Email not in the inbox | Check spam — `resend.dev` is a shared domain with no reputation |

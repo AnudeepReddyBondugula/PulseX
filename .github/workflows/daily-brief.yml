@@ -2,9 +2,19 @@ name: Daily Brief
 
 on:
   schedule:
-    # 00:00 UTC is 05:30 IST. GitHub runs scheduled jobs on a
-    # best-effort basis and often starts them late under load.
-    - cron: "0 0 * * *"
+    # 00:07 UTC is 05:37 IST.
+    #
+    # The minute matters more than the hour. Scheduled workflows are
+    # queued behind on-demand jobs, and "0 0" is the most popular cron
+    # expression there is, so runs at midnight UTC on the hour sat at
+    # the back of the day's worst queue and started about 2h45m late,
+    # three days running. An unpopular minute avoids that herd.
+    #
+    # It stays after midnight UTC on purpose. The brief takes its date,
+    # its id and its Firestore document id from the UTC date at run
+    # time, so an earlier slot like 23:40 would deliver tomorrow
+    # morning's brief labelled with yesterday's date.
+    - cron: "7 0 * * *"
   workflow_dispatch:
 
 # The run commits the seen store, so two overlapping runs would

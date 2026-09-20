@@ -39,7 +39,7 @@ to read a run, and a record of what has actually broken in production.
 
 PulseX collects AI news from 11 RSS feeds and research papers from arXiv, filters
 and ranks them with explainable heuristics, summarizes the top 15 with an LLM,
-and emails one brief every morning at 05:30 IST.
+and emails one brief every morning at 05:37 IST.
 
 The shape of the system:
 
@@ -72,7 +72,7 @@ Three things that explain most of the code:
 | Tests | 204, offline, under a second |
 | Run the suite | `uv run pytest` |
 | Run a brief | `uv run python -m backend.run_daily` |
-| Schedule | `0 0 * * *` UTC = 05:30 IST |
+| Schedule | `7 0 * * *` UTC = 05:37 IST |
 | Topics | 13 |
 | RSS sources | 11 |
 | arXiv categories | 11, one combined query, 24-hour window |

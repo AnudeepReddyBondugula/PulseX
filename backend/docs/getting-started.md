@@ -145,7 +145,7 @@ PulseX/
 ├── backend/            All the code. See architecture.md.
 ├── .github/workflows/
 │   ├── ci.yml          Tests on push and pull request
-│   └── daily-brief.yml The 05:30 IST run
+│   └── daily-brief.yml The 05:37 IST run
 ├── data/               seen_items.json, written by runs (not in a fresh clone)
 ├── .env.example        Template for the four secrets
 └── pyproject.toml      Dependencies, pytest config
