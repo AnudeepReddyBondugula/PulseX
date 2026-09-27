@@ -302,3 +302,54 @@ def test_exhaustion_stops_further_requests() -> None:
             provider.generate("second")
 
     assert client.post.call_count == 2
+
+
+def test_generate_stores_usage_information() -> None:
+    """Test that usage information from the API response is stored."""
+    client = patch_post(
+        build_response(
+            200,
+            {
+                "choices": [
+                    {"message": {"content": "Hello world"}}
+                ],
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "total_tokens": 15
+                }
+            },
+        ),
+    )
+
+    with patch("httpx.Client", return_value=client):
+        provider = OpenRouterProvider(api_key="key")
+        provider.generate("prompt")
+
+        # Verify usage information was stored
+        assert provider.last_usage is not None
+        assert provider.last_usage["prompt_tokens"] == 10
+        assert provider.last_usage["completion_tokens"] == 5
+        assert provider.last_usage["total_tokens"] == 15
+
+
+def test_generate_handles_missing_usage() -> None:
+    """Test that missing usage information doesn't break the provider."""
+    client = patch_post(
+        build_response(
+            200,
+            {
+                "choices": [
+                    {"message": {"content": "Hello world"}}
+                ]
+                # No usage field
+            },
+        ),
+    )
+
+    with patch("httpx.Client", return_value=client):
+        provider = OpenRouterProvider(api_key="key")
+        provider.generate("prompt")
+
+        # Verify usage is None when not provided
+        assert provider.last_usage is None
