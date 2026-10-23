@@ -12,15 +12,8 @@ from backend.llm.base import LLMProvider, LLMProviderError
 logger = logging.getLogger(__name__)
 
 
-OPENROUTER_API_URL = (
-    "https://openrouter.ai/api/v1/chat/completions"
-)
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Free capacity only: PulseX runs on an account with no credits.
-# OpenRouter rotates which models it serves for free and answers 404
-# for the rest, which is what broke the first runs, so the auto-router
-# comes first: it resolves to whatever is free at the time. The named
-# slugs are a backstop for when it is unavailable.
 AUTO_FREE_MODEL = "openrouter/free"
 
 FREE_MODELS: tuple[str, ...] = (
@@ -31,15 +24,11 @@ FREE_MODELS: tuple[str, ...] = (
 )
 
 DEFAULT_MODEL = FREE_MODELS[0]
-
 FREE_SUFFIX = ":free"
 
 MAX_ATTEMPTS = 3
-
 RETRY_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504})
-
 MODEL_UNAVAILABLE_STATUS_CODES = frozenset({400, 403, 404})
-
 MAX_ERROR_BODY_CHARS = 500
 
 
@@ -63,9 +52,7 @@ class OpenRouterProvider(LLMProvider):
         max_attempts: int = MAX_ATTEMPTS,
     ) -> None:
         if not api_key:
-            raise LLMProviderError(
-                "OpenRouter API key is missing",
-            )
+            raise LLMProviderError("OpenRouter API key is missing")
 
         if isinstance(model, str):
             models: tuple[str, ...] = (model,)
@@ -73,9 +60,7 @@ class OpenRouterProvider(LLMProvider):
             models = tuple(model or FREE_MODELS)
 
         if not models:
-            raise LLMProviderError(
-                "No OpenRouter model configured",
-            )
+            raise LLMProviderError("No OpenRouter model configured")
 
         self._api_key = api_key
         self._models = models
@@ -83,87 +68,65 @@ class OpenRouterProvider(LLMProvider):
         self._max_attempts = max_attempts
         self._active_model: str | None = None
         self._exhausted: Exception | None = None
+        self._last_usage: dict | None = None
+
+    @property
+    def last_usage(self) -> dict | None:
+        """Return usage information from the last successful API response."""
+        return self._last_usage
 
     def generate(self, prompt: str) -> str:
-        """Return the model's response to a prompt.
-
-        Falls through to the next configured model when one
-        cannot serve the request, and remembers the model that
-        worked so later calls do not re-walk the list.
-        """
+        """Return a response, falling through unavailable models."""
         if self._exhausted is not None:
-            # Every model was already refused this run. Retrying
-            # per item would spend the daily free-tier quota on
-            # calls that cannot succeed.
             raise LLMProviderError(
                 "No configured OpenRouter model could serve the "
                 f"request (tried: {', '.join(self._models)})"
             ) from self._exhausted
 
         last_error: Exception | None = None
-
         for model in self._candidates():
             try:
                 response = self._generate_with(prompt, model)
             except ModelUnavailableError as exc:
                 logger.warning(
-                    "Model unavailable, trying the next one: "
-                    "model=%s error=%s",
+                    "Model unavailable, trying the next one: model=%s error=%s",
                     model,
                     exc,
                 )
-
                 last_error = exc
-
                 if self._active_model == model:
                     self._active_model = None
-
                 continue
 
             self._active_model = model
-
             return response
 
         self._exhausted = last_error
-
         raise LLMProviderError(
             "No configured OpenRouter model could serve the "
             f"request (tried: {', '.join(self._models)})"
         ) from last_error
 
     def _candidates(self) -> list[str]:
-        """Return models to try, the known-good one first."""
+        """Try the known-good model first, then the configured fallbacks."""
         if self._active_model is None:
             return list(self._models)
-
         return [
             self._active_model,
-            *(
-                model
-                for model in self._models
-                if model != self._active_model
-            ),
+            *(model for model in self._models if model != self._active_model),
         ]
 
-    def _generate_with(
-        self,
-        prompt: str,
-        model: str,
-    ) -> str:
+    def _generate_with(self, prompt: str, model: str) -> str:
         """Call one model, retrying transient failures."""
         last_error: Exception | None = None
-
         for attempt in range(1, self._max_attempts + 1):
             try:
                 return self._request(prompt, model)
             except RetryableLLMError as exc:
                 last_error = exc
-
                 if attempt == self._max_attempts:
                     break
-
                 backoff = 2.0**attempt
-
                 logger.warning(
                     "OpenRouter request failed, retrying in %.0fs "
                     "(attempt %d/%d): model=%s",
@@ -172,7 +135,6 @@ class OpenRouterProvider(LLMProvider):
                     self._max_attempts,
                     model,
                 )
-
                 time.sleep(backoff)
 
         raise LLMProviderError(
@@ -184,31 +146,21 @@ class OpenRouterProvider(LLMProvider):
         """Make one OpenRouter chat completion request."""
         payload = {
             "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
+            "messages": [{"role": "user", "content": prompt}],
         }
-
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
 
         try:
-            with httpx.Client(
-                timeout=self._timeout,
-            ) as client:
+            with httpx.Client(timeout=self._timeout) as client:
                 response = client.post(
                     OPENROUTER_API_URL,
                     json=payload,
                     headers=headers,
                 )
-
                 response.raise_for_status()
-
                 data = response.json()
         except httpx.HTTPStatusError as exc:
             raise _status_error(exc, model) from exc
@@ -217,6 +169,11 @@ class OpenRouterProvider(LLMProvider):
                 f"OpenRouter request failed: {exc}"
             ) from exc
 
+        self._last_usage = (
+            data.get("usage")
+            if isinstance(data, dict) and isinstance(data.get("usage"), dict)
+            else None
+        )
         return _extract_content(data)
 
 
@@ -224,25 +181,16 @@ def _status_error(
     exc: httpx.HTTPStatusError,
     model: str,
 ) -> LLMProviderError:
-    """Classify an HTTP error and keep the server's reason.
-
-    A bare status code cannot distinguish a retired model from a
-    request the account's data policy forbids, and both answer
-    404, so the body is carried into the message.
-    """
+    """Classify an HTTP error and preserve the server's explanation."""
     status = exc.response.status_code
-
     message = (
         f"OpenRouter returned HTTP {status} for {model}: "
         f"{_response_detail(exc.response)}"
     )
-
     if status in RETRY_STATUS_CODES:
         return RetryableLLMError(message)
-
     if status in MODEL_UNAVAILABLE_STATUS_CODES:
         return ModelUnavailableError(message)
-
     return LLMProviderError(message)
 
 
@@ -255,13 +203,10 @@ def _response_detail(response: httpx.Response) -> str:
 
     if isinstance(body, dict):
         error = body.get("error")
-
         if isinstance(error, dict) and error.get("message"):
             return str(error["message"])[:MAX_ERROR_BODY_CHARS]
-
         if isinstance(error, str):
             return error[:MAX_ERROR_BODY_CHARS]
-
     return str(body)[:MAX_ERROR_BODY_CHARS]
 
 
@@ -275,8 +220,5 @@ def _extract_content(data: dict) -> str:
         ) from exc
 
     if not isinstance(content, str) or not content.strip():
-        raise LLMProviderError(
-            "OpenRouter returned an empty response",
-        )
-
+        raise LLMProviderError("OpenRouter returned an empty response")
     return content.strip()
