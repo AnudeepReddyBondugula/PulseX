@@ -42,3 +42,14 @@ def test_missing_secrets_fail_at_startup() -> None:
             email_from="brief@pulsex.dev",
             email_to="reader@example.com",
         )
+
+
+def test_required_secrets_load_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "llm-key")
+    monkeypatch.setenv("RESEND_API_KEY", "mail-key")
+    monkeypatch.setenv("EMAIL_FROM", "brief@pulsex.dev")
+    monkeypatch.setenv("EMAIL_TO", "reader@example.com")
+
+    assert Settings().openrouter_api_key == "llm-key"
