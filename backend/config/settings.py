@@ -5,10 +5,6 @@ from functools import lru_cache
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from backend.llm.providers.openrouter import (
-    AUTO_FREE_MODEL,
-    FREE_SUFFIX,
-)
 from backend.notifications.fcm import DEFAULT_TOPIC
 
 
@@ -49,7 +45,6 @@ class Settings(BaseSettings):
 
     seen_store_path: str = "data/seen_items.json"
 
-
     @field_validator("openrouter_model")
     @classmethod
     def _reject_paid_models(
@@ -63,6 +58,9 @@ class Settings(BaseSettings):
         """
         if value is None:
             return None
+
+        # Lazy import to avoid circular dependency
+        from backend.llm.providers.openrouter import AUTO_FREE_MODEL, FREE_SUFFIX
 
         if value == AUTO_FREE_MODEL:
             return value
