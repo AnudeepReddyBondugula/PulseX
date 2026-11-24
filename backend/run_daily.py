@@ -11,9 +11,7 @@ from backend.delivery.sender import (
     EmailDeliveryError,
     ResendEmailSender,
 )
-from backend.llm.providers.openrouter import (
-    OpenRouterProvider,
-)
+from backend.llm import get_default_provider
 from backend.notifications.fcm import (
     FCMNotifier,
     NotificationError,
@@ -25,11 +23,9 @@ from backend.publishing.firestore import (
     create_firestore_client,
 )
 from backend.services.brief import BriefGenerationService
+from backend.services.batch_summarization import BatchSummarizationService
 from backend.services.content_processing import ProcessedItem
 from backend.services.digest import create_digest_pipeline
-from backend.services.summarization import (
-    SummarizationService,
-)
 from backend.storage.seen_store import JSONSeenStore
 
 
@@ -55,10 +51,7 @@ def run(settings: Settings | None = None) -> int:
             failure.error,
         )
 
-    provider = OpenRouterProvider(
-        api_key=config.openrouter_api_key,
-        model=config.openrouter_model,
-    )
+    provider = get_default_provider(config)
 
     logger.info(
         "Using OpenRouter model: %s",
@@ -71,7 +64,7 @@ def run(settings: Settings | None = None) -> int:
     # content the email then discarded.
     selected = result.processed.items[: config.max_brief_items]
 
-    summarized = SummarizationService(
+    summarized = BatchSummarizationService(
         provider=provider,
     ).summarize(selected)
 

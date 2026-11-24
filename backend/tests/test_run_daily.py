@@ -22,11 +22,10 @@ from backend.services.digest import DigestResult
 COLLABORATORS = (
     "create_digest_pipeline",
     "JSONSeenStore",
-    "SummarizationService",
+    "BatchSummarizationService",
     "BriefGenerationService",
     "BriefRenderer",
     "ResendEmailSender",
-    "OpenRouterProvider",
     "create_firestore_client",
     "FirestoreBriefPublisher",
     "FCMNotifier",
@@ -89,8 +88,8 @@ def harness() -> Harness:
             seen_store=mocks[
                 "JSONSeenStore"
             ].return_value,
-            summarizer=mocks[
-                "SummarizationService"
+summarizer=mocks[
+                "BatchSummarizationService"
             ].return_value,
             sender=mocks[
                 "ResendEmailSender"
